@@ -1,4 +1,4 @@
-use crate::{Hash, HASH_LEN};
+use crate::*;
 use num::{NumCast, PrimInt};
 use rand::Rng;
 use std::cmp;
@@ -6,14 +6,14 @@ use std::ops::Range;
 
 #[macro_export]
 macro_rules! max {
-    ($x: expr) => ($x);
-    ($x: expr, $($e: expr),+) => (cmp::max($x, max!($($e),*)));
+    ($x:expr) => ($x);
+    ($x:expr, $($e:expr),+) => (cmp::max($x, max!($($e),+)));
 }
 
 #[macro_export]
 macro_rules! min {
-    ($x: expr) => ($x);
-    ($x: expr, $($e: expr),+) => (cmp::min($x, min!($($e),*)));
+    ($x:expr) => ($x);
+    ($x:expr, $($e:expr),+) => (cmp::min($x, min!($($e),+)));
 }
 
 #[macro_export]
@@ -83,34 +83,53 @@ pub fn cast<T: NumCast, U: NumCast>(n: T) -> U {
     NumCast::from(n).expect("cast(): Numcast")
 }
 
+pub fn random_byte() -> u8 {
+    rand::random::<u8>()
+}
+
 pub fn random_bytes(n: usize) -> Vec<u8> {
-    (0..n).map(|_| rand::random::<u8>()).collect()
+    (0..n).map(|_| random_byte()).collect()
+}
+
+pub fn random_hash() -> Hash {
+    slice_to_hash(&random_bytes(HASH_LEN))
 }
 
 pub fn random_hashes(n: usize) -> Vec<Hash> {
-    (0..n)
-        .map(|_| random_bytes(HASH_LEN))
-        .map(|x| slice_to_hash(&x).unwrap())
-        .collect()
+    (0..n).map(|_| random_hash()).collect()
 }
 
-pub fn slice_to_hash(slice: &[u8]) -> Option<Hash> {
+pub fn slice_to_hash(slice: &[u8]) -> Hash {
     let mut hash = [0x00; HASH_LEN];
     hash.copy_from_slice(slice);
-    Some(hash)
+    hash
 }
 
-// Fisher-Yates shuffle
-pub fn shuffle<T: Clone>(v: &mut Vec<T>) {
+// Shuffle slice based on Fisher-Yates algorithm
+pub fn shuffle<T: Clone>(v: &mut [T]) {
     let mut rng = rand::thread_rng();
     let s = v.len();
-    (1..s).for_each(|i| {
-        let q = rng.gen_range(0, s - i);
+    (0..s).for_each(|i| {
+        let q = rng.gen_range(0, s);
         v.swap(i, q);
     });
 }
 
-/// get length of the Longest Common Prefix bits for a set of two bytes
+/// Get sorted index vector from slice T
+pub fn get_sorted_indices<T>(slice: &[T], reverse: bool) -> Vec<usize>
+where
+    T: Clone + cmp::Ord,
+{
+    let mut t: Vec<_> = slice.iter().enumerate().collect();
+    if reverse {
+        t.sort_unstable_by(|(_, a), (_, b)| b.cmp(a));
+    } else {
+        t.sort_unstable_by(|(_, a), (_, b)| a.cmp(b));
+    }
+    t.iter().map(|(i, _)| *i).collect()
+}
+
+/// Get length of the Longest Common Prefix bits for a set of two bytes
 pub fn len_lcp<T>(a: &[u8], m: &Range<T>, b: &[u8], n: &Range<T>) -> T
 where
     T: PrimInt + NumCast,
@@ -122,14 +141,16 @@ where
     cast(count)
 }
 
-/// get ith-index-bit from bytes
-/// note that index i starts from 0
+/// Get ith-index-bit from bytes
+/// Note that index i starts from 0
 pub fn bit<T: PrimInt + NumCast>(bytes: &[u8], i: T) -> bool {
     let q = i.to_usize().expect("bit(): usize") / 8;
     let r = i.to_u8().expect("bit(): u8") % 8;
     (bytes[q] >> (7 - r)) & 0x01 == 0x01
 }
 
+/// When provided 'from' and 'to' index of bits,
+/// returns how many bytes are required to represent the given bits
 pub fn nbytes_across<T: PrimInt + NumCast>(start: T, end: T) -> T {
     let n = (end - (start - start % cast(8))) / cast(8);
     if end % cast(8) == cast(0) {
@@ -139,6 +160,9 @@ pub fn nbytes_across<T: PrimInt + NumCast>(start: T, end: T) -> T {
     }
 }
 
+/// When a `Range, R` and `shift number, n` are given,
+/// returns the `bytes shift size, n'` and the resulting `shifted range, R'`
+/// It varies with where the tailing happens
 pub fn offsets<T: PrimInt + NumCast>(range: &Range<T>, n: T, tail: bool) -> (T, Range<T>) {
     let x = range.start + n;
     let e: T = cast(8);
@@ -183,6 +207,7 @@ pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
     bytes_to_slicebit(bytes, &(0..bytes.len() * 8))
 }
 
+/// convert (bytes slice + Range) representation into bits in forms of Vec<bool>
 pub fn bytes_to_slicebit<T>(bytes: &[u8], range: &Range<T>) -> Vec<bool>
 where
     T: PrimInt + NumCast,

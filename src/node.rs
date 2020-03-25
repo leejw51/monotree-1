@@ -1,20 +1,5 @@
-use crate::bits::Bits;
 use crate::utils::*;
-use crate::Result;
-use crate::HASH_LEN;
-
-pub type Cell<'a> = Option<Unit<'a>>;
-
-pub enum Node<'a> {
-    Soft(Cell<'a>),
-    Hard(Cell<'a>, Cell<'a>),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Unit<'a> {
-    pub hash: &'a [u8],
-    pub bits: Bits<'a>,
-}
+use crate::*;
 
 impl<'a> Node<'a> {
     pub fn new(lc: Cell<'a>, rc: Cell<'a>) -> Self {

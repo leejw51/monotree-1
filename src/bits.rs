@@ -1,14 +1,5 @@
 use crate::utils::*;
-use crate::Result;
-use std::ops::Range;
-
-pub type BitsLen = u16;
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Bits<'a> {
-    pub path: &'a [u8],
-    pub range: Range<BitsLen>,
-}
+use crate::*;
 
 impl<'a> Bits<'a> {
     pub fn new(bytes: &'a [u8]) -> Self {
@@ -19,10 +10,11 @@ impl<'a> Bits<'a> {
     }
 
     pub fn from_bytes(bytes: &'a [u8]) -> Self {
-        let start: BitsLen = bytes_to_int(&bytes[..2]);
-        let end: BitsLen = bytes_to_int(&bytes[2..4]);
+        let u = std::mem::size_of::<BitsLen>();
+        let start: BitsLen = bytes_to_int(&bytes[..u]);
+        let end: BitsLen = bytes_to_int(&bytes[u..2 * u]);
         Self {
-            path: &bytes[4..],
+            path: &bytes[2 * u..],
             range: start..end,
         }
     }
